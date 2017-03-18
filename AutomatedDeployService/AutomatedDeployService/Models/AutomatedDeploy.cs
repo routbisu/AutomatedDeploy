@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,27 +22,29 @@ namespace AutomatedDeployService.Models
         public int PollingDuration = 5000;
 
         // All Deployment Jobs
-        private List<DeploymentParams> AllDeploymentJobs;
+        private List<DeploymentParams> AllDeploymentJobs = new List<DeploymentParams>();
         
         public AutomatedDeploy()
         {
             ReadAllSettings();
-            // Create LogFile
-
-            if (File.Exists(LogFileLocation) == false)
-            {
-                File.Create(LogFileLocation);
-            }
 
             // Create DBFile
             if (File.Exists(DBFileLocation) == false)
             {
-                File.Create(DBFileLocation);
+                FileStream fs = File.Create(DBFileLocation);
+                fs.Close();
             }
-            
+
+            // Create Log File
+            if (File.Exists(LogFileLocation) == false)
+            {
+                FileStream fs = File.Create(LogFileLocation);
+                fs.Close();
+            }
+
         }
 
-        public IEnumerable<SettingFileParam> ReadAllSettings()
+        public void ReadAllSettings()
         { 
             try
             {
@@ -86,11 +89,8 @@ namespace AutomatedDeployService.Models
             catch (Exception ex)
             {
                 // Write Exception to Default Log File
-                StreamWriter writer = File.AppendText("default_log.txt");
-                writer.WriteLine(DateTime.Now.ToString() + ": " + ex.Message);
-                writer.Close();
+                LogData(ex.Message, "default_log.txt");
             }
-            return null;
         }
         
         public FileProperties GetFileProperties(string fileLocation)
@@ -106,33 +106,35 @@ namespace AutomatedDeployService.Models
                 };
             }
             catch (Exception ex)
-            {   
+            {
                 // Write Exception to Default Log File
-                StreamWriter writer = File.AppendText(LogFileLocation);
-                writer.WriteLine(DateTime.Now.ToString() + ": " + ex.Message);
-                writer.Close();
+                LogData(ex.Message);
                 return null;
             }
         }
 
-        public bool UpdateFileProperties(string deployID, DeploymentParams deploymentParam, FileProperties fileProperties)
+        public bool UpdateFileProperties(DeploymentParams deploymentParam, FileProperties fileProperties)
         {
             try
             {
-                IEnumerable<string> allLines = File.ReadLines(DBFileLocation);
+                List<string> allLines = File.ReadLines(DBFileLocation).ToList();
+
+                List<string> allNewLines = new List<string>();
+
                 bool DataFound = false;
                 foreach (string line in allLines)
                 {
                     if (line.Length > 0)
                     {
                         string[] allParams = line.Split('|');
-                        if (allParams[0] == deployID)
+                        if (allParams[0] == deploymentParam.DeploymentID)
                         {
-                            allParams[1] = deploymentParam.MonitorFileLocation;
-                            allParams[2] = fileProperties.FileSize.ToString();
-                            allParams[3] = fileProperties.LastModifiedTime;
-
+                            allNewLines.Add(deploymentParam.DeploymentID + "|" + fileProperties.FileSize.ToString() + "|" + fileProperties.LastModifiedTime);
                             DataFound = true;
+                        }
+                        else
+                        {
+                            allNewLines.Add(line);
                         }
                     }
                 }
@@ -140,7 +142,7 @@ namespace AutomatedDeployService.Models
                 if (DataFound)
                 {
                     StringBuilder stringBuilder = new StringBuilder();
-                    foreach (string line in allLines)
+                    foreach (string line in allNewLines)
                     {
                         stringBuilder.Append(line);
                         stringBuilder.Append(Environment.NewLine);
@@ -152,8 +154,7 @@ namespace AutomatedDeployService.Models
                 {
                     // Add new line to the db file
                     StreamWriter writer = File.AppendText(DBFileLocation);
-                    string newLine = deploymentParam.DeploymentID + "|" + deploymentParam.MonitorFileLocation
-                        + "|" + fileProperties.FileSize + "|" + fileProperties.LastModifiedTime;
+                    string newLine = deploymentParam.DeploymentID + "|" + fileProperties.FileSize + "|" + fileProperties.LastModifiedTime;
                     writer.WriteLine(newLine);
                     writer.Close();
                     return true;
@@ -162,9 +163,7 @@ namespace AutomatedDeployService.Models
             catch (Exception ex)
             {
                 // Write Exception to Default Log File
-                StreamWriter writer = File.AppendText(LogFileLocation);
-                writer.WriteLine(DateTime.Now.ToString() + ": " + ex.Message);
-                writer.Close();
+                LogData(ex.Message);
                 return false;
             }
             
@@ -182,8 +181,8 @@ namespace AutomatedDeployService.Models
                     {
                         return new FileProperties
                         {
-                            FileSize = allParams[2],
-                            LastModifiedTime = allParams[3]
+                            FileSize = Convert.ToInt64(allParams[1]),
+                            LastModifiedTime = allParams[2]
                         };
                     }
                 }
@@ -193,9 +192,7 @@ namespace AutomatedDeployService.Models
             catch (Exception ex)
             {
                 // Write Exception to Default Log File
-                StreamWriter writer = File.AppendText(LogFileLocation);
-                writer.WriteLine(DateTime.Now.ToString() + ": " + ex.Message);
-                writer.Close();
+                LogData(ex.Message);
                 return null;
             }
             
@@ -203,11 +200,72 @@ namespace AutomatedDeployService.Models
 
         public void PerformDeployment()
         {
-            // Perform deployment for each job
-            foreach(DeploymentParams deploymentParam in AllDeploymentJobs)
+            try
             {
+                // Perform deployment for each job
+                foreach (DeploymentParams deploymentParam in AllDeploymentJobs)
+                {
+                    // Get File Properties
+                    FileProperties fileProperties = GetFileProperties(deploymentParam.MonitorFileLocation);
+                    FileProperties dbFileProperties = GetFilePropertiesFromDB(deploymentParam.DeploymentID);
 
+                    if (fileProperties == null)
+                    {
+                        throw new Exception("Deployment File " + deploymentParam.MonitorFileLocation + " not found at specified location");
+                    }
+
+                    if(dbFileProperties == null)
+                    {
+                        UpdateFileProperties(deploymentParam, fileProperties);
+                        RunBatchJob(deploymentParam.BatchFileLocation);
+
+                        
+                    }
+                    else
+                    {
+                        // Perform deployment if the file size or last modified time has changed
+                        if (fileProperties.FileSize != dbFileProperties.FileSize ||
+                            fileProperties.LastModifiedTime != fileProperties.LastModifiedTime)
+                        {
+                            RunBatchJob(deploymentParam.BatchFileLocation);
+
+                            // Update new file size and time in db
+                            UpdateFileProperties(deploymentParam, fileProperties);
+                        }
+                    }
+                }
             }
+            catch (Exception ex)
+            {
+                // Write Exception to Default Log File
+                LogData(ex.Message);
+            }
+        }
+
+        public void RunBatchJob(string batchLocation)
+        {
+            try
+            {
+                Process.Start(batchLocation);
+                LogData(batchLocation + ": Executed Successfully");
+            }
+            catch (Exception ex)
+            {
+                LogData("File Name: " + batchLocation + " " + ex.Message);
+            }
+            
+        }
+
+        public void LogData(string logMessage, string logFileLocation = "DEFAULT")
+        {
+            if(logFileLocation == "DEFAULT")
+            {
+                logFileLocation = LogFileLocation;
+            }
+
+            StreamWriter writer = File.AppendText(logFileLocation);
+            writer.WriteLine(DateTime.Now.ToString() + ": " + logMessage);
+            writer.Close();
         }
     }
 }

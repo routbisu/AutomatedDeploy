@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="Models\AutomatedDeploy.cs" />
     <Compile Include="Models\DeploymentParams.cs" />
+    <Compile Include="Models\FileProperties.cs" />
     <Compile Include="Models\SettingFileParam.cs" />
     <Compile Include="Service1.cs">
       <SubType>Component</SubType>
