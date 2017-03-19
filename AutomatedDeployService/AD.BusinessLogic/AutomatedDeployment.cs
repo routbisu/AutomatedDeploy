@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AD.BusinessLogic.Models;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,67 +7,77 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AutomatedDeployService.Models
+namespace AD.BusinessLogic
 {
-    public class AutomatedDeploy
+    public class AutomatedDeployment
     {
         /// <summary>
         /// Configuration parameters used by the service
         /// </summary>
-       
+
         // Location of log file
         private string LogFileLocation;
         // Location of DB File
-        private string DBFileLocation;
-        // Polling Duration in seconds
+        private const string DBFileLocation = "repo.db";
+        // Location of Default Log File
+        private const string DefaultLogFileLocation = "app_log.txt";
+
+        // Polling Duration in seconds - Default 5 seconds
         public int PollingDuration = 5000;
 
         // All Deployment Jobs
         private List<DeploymentParams> AllDeploymentJobs = new List<DeploymentParams>();
-        
-        public AutomatedDeploy()
+
+        public AutomatedDeployment()
         {
-            ReadAllSettings();
-
-            // Create DBFile
-            if (File.Exists(DBFileLocation) == false)
+            try
             {
-                FileStream fs = File.Create(DBFileLocation);
-                fs.Close();
-            }
+                ReadAllSettings();
 
-            // Create Log File
-            if (File.Exists(LogFileLocation) == false)
+                // Create DBFile
+                if (File.Exists(DBFileLocation) == false)
+                {
+                    FileStream fs = File.Create(DBFileLocation);
+                    fs.Close();
+                }
+
+                // Create Log File
+                if(LogFileLocation == null)
+                {
+                    LogFileLocation = "log.txt";
+                }
+
+                if (File.Exists(LogFileLocation) == false)
+                {
+                    FileStream fs = File.Create(LogFileLocation);
+                    fs.Close();
+                }
+            }
+            catch (Exception ex)
             {
-                FileStream fs = File.Create(LogFileLocation);
-                fs.Close();
+                LogData(ex.Message, DefaultLogFileLocation);
             }
-
         }
 
         public void ReadAllSettings()
-        { 
+        {
             try
             {
                 List<string> settings = new List<string>();
                 IEnumerable<string> allSettings = File.ReadLines("settings.config");
-                
-                foreach(string settingLine in allSettings)
+
+                foreach (string settingLine in allSettings)
                 {
                     // Discard comments
-                    if(settingLine != null)
+                    if (settingLine != null)
                     {
-                        if(settingLine.Substring(0, 1).Equals("#") == false)
+                        if (settingLine.Substring(0, 1).Equals("#") == false)
                         {
                             string[] settingLineParams = settingLine.Split('|');
-                            switch(settingLineParams[0].ToLower())
+                            switch (settingLineParams[0].ToLower())
                             {
                                 case "logfilelocation":
                                     LogFileLocation = settingLineParams[1];
-                                    break;
-
-                                case "dbfilelocation":
-                                    DBFileLocation = settingLineParams[1];
                                     break;
 
                                 case "pollingduration":
@@ -89,10 +100,10 @@ namespace AutomatedDeployService.Models
             catch (Exception ex)
             {
                 // Write Exception to Default Log File
-                LogData(ex.Message, "default_log.txt");
+                LogData(ex.Message, DefaultLogFileLocation);
             }
         }
-        
+
         public FileProperties GetFileProperties(string fileLocation)
         {
             try
@@ -166,7 +177,7 @@ namespace AutomatedDeployService.Models
                 LogData(ex.Message);
                 return false;
             }
-            
+
         }
 
         public FileProperties GetFilePropertiesFromDB(string deployID)
@@ -195,7 +206,7 @@ namespace AutomatedDeployService.Models
                 LogData(ex.Message);
                 return null;
             }
-            
+
         }
 
         public void PerformDeployment()
@@ -214,12 +225,12 @@ namespace AutomatedDeployService.Models
                         throw new Exception("Deployment File " + deploymentParam.MonitorFileLocation + " not found at specified location");
                     }
 
-                    if(dbFileProperties == null)
+                    if (dbFileProperties == null)
                     {
                         UpdateFileProperties(deploymentParam, fileProperties);
                         RunBatchJob(deploymentParam.BatchFileLocation);
 
-                        
+
                     }
                     else
                     {
@@ -253,12 +264,12 @@ namespace AutomatedDeployService.Models
             {
                 LogData("File Name: " + batchLocation + " " + ex.Message);
             }
-            
+
         }
 
         public void LogData(string logMessage, string logFileLocation = "DEFAULT")
         {
-            if(logFileLocation == "DEFAULT")
+            if (logFileLocation == "DEFAULT")
             {
                 logFileLocation = LogFileLocation;
             }

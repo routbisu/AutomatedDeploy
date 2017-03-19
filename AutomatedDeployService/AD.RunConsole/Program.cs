@@ -1,16 +1,16 @@
-﻿using AutomatedDeployService;
-using AutomatedDeployService.Models;
+﻿using AD.BusinessLogic;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Timers;
 
-namespace TestConsole
+namespace AD.RunConsole
 {
     class Program
     {
-        public static AutomatedDeploy automatedDeploy = new AutomatedDeploy();
+        public static AutomatedDeployment automatedDeploy = new AutomatedDeployment();
 
         static void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
@@ -19,7 +19,6 @@ namespace TestConsole
 
         static void Main(string[] args)
         {
-
             Timer deploymentTimer = new Timer();
             deploymentTimer.Interval = automatedDeploy.PollingDuration;
             deploymentTimer.Elapsed += timer_Elapsed;

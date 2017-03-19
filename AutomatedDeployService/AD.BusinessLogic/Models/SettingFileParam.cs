@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AutomatedDeployService.Models
+namespace AD.BusinessLogic.Models
 {
     public class SettingFileParam
     {
