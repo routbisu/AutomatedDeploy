@@ -9,26 +9,24 @@ using System.Threading.Tasks;
 
 namespace AD.BusinessLogic
 {
-    public class AutomatedDeployment
+    public static class AutomatedDeployment
     {
         /// <summary>
         /// Configuration parameters used by the service
         /// </summary>
 
         // Location of log file
-        private string LogFileLocation;
+        private static string LogFileLocation = AppDomain.CurrentDomain.BaseDirectory + "\\app_log.txt";
         // Location of DB File
-        private const string DBFileLocation = "repo.db";
-        // Location of Default Log File
-        private const string DefaultLogFileLocation = "app_log.txt";
+        private static string DBFileLocation = AppDomain.CurrentDomain.BaseDirectory + "\\repo.db";
 
         // Polling Duration in seconds - Default 5 seconds
-        public int PollingDuration = 5000;
+        public static int PollingDuration = 5000;
 
         // All Deployment Jobs
-        private List<DeploymentParams> AllDeploymentJobs = new List<DeploymentParams>();
+        private static List<DeploymentParams> AllDeploymentJobs = new List<DeploymentParams>();
 
-        public AutomatedDeployment()
+        public static void AutoDeployInit()
         {
             try
             {
@@ -40,31 +38,19 @@ namespace AD.BusinessLogic
                     FileStream fs = File.Create(DBFileLocation);
                     fs.Close();
                 }
-
-                // Create Log File
-                if(LogFileLocation == null)
-                {
-                    LogFileLocation = "log.txt";
-                }
-
-                if (File.Exists(LogFileLocation) == false)
-                {
-                    FileStream fs = File.Create(LogFileLocation);
-                    fs.Close();
-                }
             }
             catch (Exception ex)
             {
-                LogData(ex.Message, DefaultLogFileLocation);
+                LogData(ex.Message);
             }
         }
 
-        public void ReadAllSettings()
+        public static void ReadAllSettings()
         {
             try
             {
                 List<string> settings = new List<string>();
-                IEnumerable<string> allSettings = File.ReadLines("settings.config");
+                IEnumerable<string> allSettings = File.ReadLines(AppDomain.CurrentDomain.BaseDirectory + "\\settings.config");
 
                 foreach (string settingLine in allSettings)
                 {
@@ -100,11 +86,11 @@ namespace AD.BusinessLogic
             catch (Exception ex)
             {
                 // Write Exception to Default Log File
-                LogData(ex.Message, DefaultLogFileLocation);
+                LogData(ex.Message);
             }
         }
 
-        public FileProperties GetFileProperties(string fileLocation)
+        public static FileProperties GetFileProperties(string fileLocation)
         {
             try
             {
@@ -124,7 +110,7 @@ namespace AD.BusinessLogic
             }
         }
 
-        public bool UpdateFileProperties(DeploymentParams deploymentParam, FileProperties fileProperties)
+        public static bool UpdateFileProperties(DeploymentParams deploymentParam, FileProperties fileProperties)
         {
             try
             {
@@ -180,7 +166,7 @@ namespace AD.BusinessLogic
 
         }
 
-        public FileProperties GetFilePropertiesFromDB(string deployID)
+        public static FileProperties GetFilePropertiesFromDB(string deployID)
         {
             try
             {
@@ -209,7 +195,7 @@ namespace AD.BusinessLogic
 
         }
 
-        public void PerformDeployment()
+        public static void PerformDeployment()
         {
             try
             {
@@ -253,7 +239,7 @@ namespace AD.BusinessLogic
             }
         }
 
-        public void RunBatchJob(string batchLocation)
+        public static void RunBatchJob(string batchLocation)
         {
             try
             {
@@ -267,16 +253,12 @@ namespace AD.BusinessLogic
 
         }
 
-        public void LogData(string logMessage, string logFileLocation = "DEFAULT")
+        public static void LogData(string logMessage)
         {
-            if (logFileLocation == "DEFAULT")
-            {
-                logFileLocation = LogFileLocation;
-            }
-
-            StreamWriter writer = File.AppendText(logFileLocation);
-            writer.WriteLine(DateTime.Now.ToString() + ": " + logMessage);
-            writer.Close();
+            StreamWriter sw = new StreamWriter(LogFileLocation, true);
+            sw.WriteLine(DateTime.Now.ToString() + ": " + logMessage);
+            sw.Flush();
+            sw.Close();
         }
     }
 }

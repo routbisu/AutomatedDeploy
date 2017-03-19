@@ -10,17 +10,17 @@ namespace AD.RunConsole
 {
     class Program
     {
-        public static AutomatedDeployment automatedDeploy = new AutomatedDeployment();
-
         static void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            automatedDeploy.PerformDeployment();
+            AutomatedDeployment.PerformDeployment();
         }
 
         static void Main(string[] args)
         {
+            AutomatedDeployment.AutoDeployInit();
+
             Timer deploymentTimer = new Timer();
-            deploymentTimer.Interval = automatedDeploy.PollingDuration;
+            deploymentTimer.Interval = AutomatedDeployment.PollingDuration;
             deploymentTimer.Elapsed += timer_Elapsed;
             deploymentTimer.Start();
 
